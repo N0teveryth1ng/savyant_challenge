@@ -1,14 +1,14 @@
 from decimal import Decimal
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.services import order_service
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(prefix="/api/orders", tags=["orders"])
 
 
 class OrderItem(BaseModel):
@@ -22,15 +22,15 @@ class OrderData(BaseModel):
     discount_percent: Decimal = Field(default=0, ge=0, le=20)
 
 
-@router.post("")
+@router.post("", status_code=status.HTTP_201_CREATED)
 def create_order(
     data: OrderData,
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
     try:
-        order_id = order_service.create_order(db, data, user["id"])
-        return {"id": order_id, "status": "draft"}
+        order_id, order_number = order_service.create_order(db, data, user["id"])
+        return {"id": order_id, "order_number": order_number, "status": "draft"}
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error))
 

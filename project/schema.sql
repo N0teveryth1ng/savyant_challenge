@@ -53,15 +53,18 @@ CREATE TABLE IF NOT EXISTS products (
 -- sales_orders
 CREATE TABLE IF NOT EXISTS sales_orders (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    order_number VARCHAR(20) NOT NULL,
     customer_id INT UNSIGNED NOT NULL,
     created_by INT UNSIGNED NOT NULL,
     status ENUM('draft', 'confirmed', 'cancelled') NOT NULL DEFAULT 'draft',
     discount_percent DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
     subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    discount_amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     total DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    UNIQUE KEY uq_sales_orders_number (order_number),
     KEY idx_sales_orders_customer (customer_id),
     KEY idx_sales_orders_created_by (created_by),
     CONSTRAINT fk_sales_orders_customer

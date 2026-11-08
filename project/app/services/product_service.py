@@ -6,7 +6,7 @@ import pymysql
 
 
 def import_products_csv(db, csv_text, user_id):
-    columns = ["product_code", "name", "category", "price", "stock_quantity", "is_active"]
+    columns = ["product_code", "product_name", "category", "price", "stock_quantity", "status"]
     reader = csv.DictReader(io.StringIO(csv_text))
     if reader.fieldnames != columns:
         raise ValueError("CSV headers must be: " + ", ".join(columns))
@@ -18,8 +18,8 @@ def import_products_csv(db, csv_text, user_id):
     for row_number, row in enumerate(reader, start=2):
         row = {column: (row.get(column) or "").strip() for column in columns}
         try:
-            if not row["product_code"] or not row["name"] or not row["category"]:
-                raise ValueError("product_code, name, and category are required")
+            if not row["product_code"] or not row["product_name"] or not row["category"]:
+                raise ValueError("product_code, product_name, and category are required")
 
             if row["product_code"] in product_codes:
                 raise ValueError("duplicate product_code in file")
@@ -31,16 +31,17 @@ def import_products_csv(db, csv_text, user_id):
                 raise ValueError("price cannot be negative")
             if stock_quantity < 0:
                 raise ValueError("stock_quantity cannot be negative")
-            if row["is_active"].lower() not in ("true", "false"):
-                raise ValueError("is_active must be true or false")
+            if row["status"].lower() not in ("active", "inactive"):
+                raise ValueError("status must be active or inactive")
 
             products.append({
                 "product_code": row["product_code"],
-                "name": row["name"],
+                "name": row["product_name"],
                 "category": row["category"],
                 "price": price,
                 "stock_quantity": stock_quantity,
-                "is_active": row["is_active"].lower() == "true",
+                "is_active": row["status"].lower() == "active",
+                "row_number": row_number,
             })
         except (InvalidOperation, ValueError) as error:
             errors.append(f"Row {row_number}: {error}")
@@ -57,9 +58,14 @@ def import_products_csv(db, csv_text, user_id):
             f"SELECT sku FROM products WHERE sku IN ({placeholders})",
             [product["product_code"] for product in products],
         )
-        existing_codes = [row["sku"] for row in cur.fetchall()]
-    if existing_codes:
-        raise ValueError("Product code already exists: " + ", ".join(existing_codes))
+        existing_codes = {row["sku"] for row in cur.fetchall()}
+    for product in products:
+        if product["product_code"] in existing_codes:
+            errors.append(
+                f"Row {product['row_number']}: product_code already exists in database"
+            )
+    if errors:
+        raise ValueError("; ".join(errors))
 
     try:
         with db.cursor() as cur:
@@ -100,39 +106,50 @@ def create_product(db, data):
         raise ValueError("Product code already exists") from error
 
 
-def list_products(db, search, category, is_active):
-    query = (
-        "SELECT id, sku AS product_code, product_name AS name, category, "
-        "unit_price AS price, stock_quantity, is_active FROM products WHERE 1=1"
-    )
+def list_products(db, search, category, is_active, limit, offset, user):
+    where = " WHERE 1=1"
     params = []
 
     if search:
-        query += " AND (sku LIKE %s OR product_name LIKE %s)"
+        where += " AND (sku LIKE %s OR product_name LIKE %s)"
         search_value = f"%{search}%"
         params += [search_value, search_value]
 
     if category is not None:
-        query += " AND category = %s"
+        where += " AND category = %s"
         params.append(category)
 
-    if is_active is not None:
-        query += " AND is_active = %s"
+    if user["role"] == "sales":
+        where += " AND is_active = 1"
+    elif is_active is not None:
+        where += " AND is_active = %s"
         params.append(is_active)
 
     with db.cursor() as cur:
-        cur.execute(query, params)
-        return cur.fetchall()
-
-
-def get_product(db, product_id):
-    with db.cursor() as cur:
-        cur.execute(
+        cur.execute("SELECT COUNT(*) AS total FROM products" + where, params)
+        total = cur.fetchone()["total"]
+        query = (
             "SELECT id, sku AS product_code, product_name AS name, category, "
-            "unit_price AS price, stock_quantity, is_active "
-            "FROM products WHERE id = %s",
-            (product_id,),
+            "unit_price AS price, stock_quantity, is_active FROM products"
+            + where + " ORDER BY id LIMIT %s OFFSET %s"
         )
+        cur.execute(query, params + [limit, offset])
+        products = cur.fetchall()
+        return {"items": products, "total": total, "limit": limit, "offset": offset}
+
+
+def get_product(db, product_id, user=None):
+    query = (
+        "SELECT id, sku AS product_code, product_name AS name, category, "
+        "unit_price AS price, stock_quantity, is_active "
+        "FROM products WHERE id = %s"
+    )
+    params = [product_id]
+    if user and user["role"] == "sales":
+        query += " AND is_active = 1"
+
+    with db.cursor() as cur:
+        cur.execute(query, params)
         return cur.fetchone()
 
 

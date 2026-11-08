@@ -49,11 +49,14 @@ td.actions button { padding: 6px 9px; font-size: 13px; }
 .message.error { color: #b42318; }
 .order-form { display: grid; gap: 12px; }
 .order-form > label { display: grid; gap: 5px; max-width: 380px; }
-.order-row { display: grid; grid-template-columns: minmax(180px, 1fr) 130px auto; gap: 8px; margin-bottom: 8px; }
+.order-row { display: grid; grid-template-columns: minmax(180px, 1fr) 130px 100px auto; gap: 8px; margin-bottom: 8px; align-items: center; }
+.order-amount { text-align: right; font-variant-numeric: tabular-nums; }
 .discount { margin-top: 6px; }
 .totals { display: flex; justify-content: flex-end; gap: 28px; padding: 12px 0; border-top: 1px solid var(--line); }
 .totals span { display: flex; gap: 8px; }
 .report-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-filters { display: flex; flex-wrap: wrap; gap: 16px; }
+.report-filters label { display: grid; gap: 4px; }
 pre { overflow: auto; margin: 0; padding: 16px; }
 @media (max-width: 760px) {
   .topbar { align-items: flex-start; flex-direction: column; }

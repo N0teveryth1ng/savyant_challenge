@@ -16,7 +16,7 @@ def create_customer(db, data):
         raise ValueError("A customer with this email already exists") from error
 
 
-def list_customers(db, search, is_active):
+def list_customers(db, search, is_active, user):
     query = (
         "SELECT id, customer_name AS name, email, phone AS mobile, city, is_active "
         "FROM customers WHERE 1=1"
@@ -28,7 +28,9 @@ def list_customers(db, search, is_active):
         search_value = f"%{search}%"
         params += [search_value, search_value, search_value]
 
-    if is_active is not None:
+    if user["role"] == "sales":
+        query += " AND is_active = 1"
+    elif is_active is not None:
         query += " AND is_active = %s"
         params.append(is_active)
 
@@ -37,13 +39,17 @@ def list_customers(db, search, is_active):
         return cur.fetchall()
 
 
-def get_customer(db, customer_id):
+def get_customer(db, customer_id, user=None):
+    query = (
+        "SELECT id, customer_name AS name, email, phone AS mobile, city, is_active "
+        "FROM customers WHERE id = %s"
+    )
+    params = [customer_id]
+    if user and user["role"] == "sales":
+        query += " AND is_active = 1"
+
     with db.cursor() as cur:
-        cur.execute(
-            "SELECT id, customer_name AS name, email, phone AS mobile, city, is_active "
-            "FROM customers WHERE id = %s",
-            (customer_id,),
-        )
+        cur.execute(query, params)
         return cur.fetchone()
 
 

@@ -1,26 +1,39 @@
-from fastapi import APIRouter, Depends
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 
 from app.database import get_db
+from app.dependencies import require_admin
 from app.services import report_service
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(prefix="/api/reports", tags=["reports"])
 
 
-@router.get("/sales-by-customer")
-def sales_by_customer(db=Depends(get_db)):
-    return report_service.sales_by_customer(db)
+@router.get("/customer-sales")
+def customer_sales(
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
+    db=Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return report_service.customer_sales(db, date_from, date_to)
 
 
-@router.get("/sales-by-product")
-def sales_by_product(db=Depends(get_db)):
-    return report_service.sales_by_product(db)
+@router.get("/product-sales")
+def product_sales(db=Depends(get_db), admin=Depends(require_admin)):
+    return report_service.product_sales(db)
 
 
-@router.get("/monthly-sales")
-def monthly_sales(db=Depends(get_db)):
-    return report_service.monthly_sales(db)
+@router.get("/low-stock")
+def low_stock(
+    threshold: int = Query(5, ge=0),
+    db=Depends(get_db),
+    admin=Depends(require_admin),
+):
+    return report_service.low_stock(db, threshold)
 
 
-@router.get("/inventory")
-def inventory(db=Depends(get_db)):
-    return report_service.inventory(db)
+@router.get("/stock-movements")
+def stock_movement_history(db=Depends(get_db), admin=Depends(require_admin)):
+    return report_service.stock_movement_history(db)

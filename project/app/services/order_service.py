@@ -1,35 +1,60 @@
 from decimal import Decimal
+import uuid
+
+
+def calculate_total(items):
+    total = Decimal("0.00")
+    for item in items:
+        if "qty" not in item or "rate" not in item or item["qty"] is None or item["rate"] is None:
+            raise ValueError("Each item needs a quantity and rate")
+        try:
+            quantity_value = Decimal(str(item["qty"]))
+            rate = Decimal(str(item["rate"]))
+        except (TypeError, ValueError, ArithmeticError):
+            raise ValueError("Quantity and rate must be valid numbers")
+        if not quantity_value.is_finite() or quantity_value != quantity_value.to_integral_value():
+            raise ValueError("Quantity must be a whole number")
+        quantity = int(quantity_value)
+        if quantity <= 0:
+            raise ValueError("Quantity must be greater than zero")
+        if not rate.is_finite() or rate < 0:
+            raise ValueError("Rate cannot be negative")
+        amount = rate * quantity
+        total += amount
+    return total.quantize(Decimal("0.01"))
 
 
 def calculate_totals(items, discount_percent=0):
-    total = Decimal("0.00")
-    for item in items:
-        if "quantity" not in item or "unit_price" not in item:
-            raise ValueError("Each item needs a quantity and rate")
-        if item["quantity"] <= 0:
-            raise ValueError("Quantity must be greater than zero")
-        if item["unit_price"] < 0:
-            raise ValueError("Rate cannot be negative")
-        amount = item["unit_price"] * item["quantity"]
-        total += amount
+    discount = Decimal(str(discount_percent))
+    if not discount.is_finite() or discount < 0 or discount > 20:
+        raise ValueError("Discount must be between 0 and 20 percent")
 
-    subtotal = total.quantize(Decimal("0.01"))
-    total = subtotal * (100 - discount_percent) / 100
-    return subtotal, total.quantize(Decimal("0.01"))
+    subtotal = calculate_total([
+        {"qty": item.get("quantity"), "rate": item.get("unit_price")}
+        for item in items
+    ])
+
+    discount_amount = (subtotal * discount / 100).quantize(Decimal("0.01"))
+    total = subtotal - discount_amount
+    return subtotal, discount_amount, total
 
 
-def get_order_data(db, requested_items):
+def get_order_data(db, customer_id, requested_items):
     items = []
     product_ids = set()
 
     with db.cursor() as cur:
+        cur.execute("SELECT id FROM customers WHERE id = %s AND is_active = 1", (customer_id,))
+        if not cur.fetchone():
+            raise ValueError("Active customer not found")
+
         for requested in requested_items:
             if requested.product_id in product_ids:
                 raise ValueError("A product can only appear once in an order")
             product_ids.add(requested.product_id)
 
             cur.execute(
-                "SELECT unit_price FROM products WHERE id = %s",
+                "SELECT unit_price FROM products WHERE id = %s AND is_active = 1",
                 (requested.product_id,),
             )
             product = cur.fetchone()
@@ -61,21 +86,24 @@ def save_order_items(cur, order_id, items):
 
 def create_order(db, data, user_id):
     try:
-        items = get_order_data(db, data.items)
-        subtotal, total = calculate_totals(items, data.discount_percent)
+        items = get_order_data(db, data.customer_id, data.items)
+        subtotal, discount_amount, total = calculate_totals(items, data.discount_percent)
+        order_number = "SO-" + uuid.uuid4().hex[:12].upper()
 
         with db.cursor() as cur:
             cur.execute(
                 "INSERT INTO sales_orders "
-                "(customer_id, created_by, status, discount_percent, subtotal, total) "
-                "VALUES (%s, %s, 'draft', %s, %s, %s)",
-                (data.customer_id, user_id, data.discount_percent, subtotal, total),
+                "(order_number, customer_id, created_by, status, discount_percent, "
+                "subtotal, discount_amount, total) "
+                "VALUES (%s, %s, %s, 'draft', %s, %s, %s, %s)",
+                (order_number, data.customer_id, user_id, data.discount_percent,
+                 subtotal, discount_amount, total),
             )
             order_id = cur.lastrowid
             save_order_items(cur, order_id, items)
 
         db.commit()
-        return order_id
+        return order_id, order_number
     except Exception:
         db.rollback()
         raise
@@ -124,14 +152,15 @@ def update_draft_order(db, order_id, data, user):
         raise ValueError("Only draft orders can be edited")
 
     try:
-        items = get_order_data(db, data.items)
-        subtotal, total = calculate_totals(items, data.discount_percent)
+        items = get_order_data(db, data.customer_id, data.items)
+        subtotal, discount_amount, total = calculate_totals(items, data.discount_percent)
 
         with db.cursor() as cur:
             cur.execute(
                 "UPDATE sales_orders SET customer_id = %s, discount_percent = %s, "
-                "subtotal = %s, total = %s WHERE id = %s",
-                (data.customer_id, data.discount_percent, subtotal, total, order_id),
+                "subtotal = %s, discount_amount = %s, total = %s WHERE id = %s",
+                (data.customer_id, data.discount_percent, subtotal,
+                 discount_amount, total, order_id),
             )
             cur.execute(
                 "DELETE FROM sales_order_items WHERE sales_order_id = %s",

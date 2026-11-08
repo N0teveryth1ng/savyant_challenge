@@ -1,14 +1,14 @@
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.dependencies import require_admin
+from app.dependencies import get_current_user, require_admin
 from app.services import product_service
 
-router = APIRouter(prefix="/products", tags=["products"])
+router = APIRouter(prefix="/api/products", tags=["products"])
 
 
 class ProductData(BaseModel):
@@ -25,8 +25,12 @@ class StockAdjustment(BaseModel):
     reason: str
 
 
-@router.post("")
-def create_product(data: ProductData, db=Depends(get_db)):
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_product(
+    data: ProductData,
+    db=Depends(get_db),
+    admin=Depends(require_admin),
+):
     try:
         product_service.create_product(db, data)
         return {"message": "Product created"}
@@ -39,14 +43,17 @@ def list_products(
     search: Optional[str] = None,
     category: Optional[str] = None,
     is_active: Optional[bool] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     db=Depends(get_db),
+    user=Depends(get_current_user),
 ):
-    return product_service.list_products(db, search, category, is_active)
+    return product_service.list_products(db, search, category, is_active, limit, offset, user)
 
 
 @router.get("/{product_id}")
-def get_product(product_id: int, db=Depends(get_db)):
-    product = product_service.get_product(db, product_id)
+def get_product(product_id: int, db=Depends(get_db), user=Depends(get_current_user)):
+    product = product_service.get_product(db, product_id, user)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
@@ -57,6 +64,7 @@ def update_product(
     product_id: int,
     data: ProductData,
     db=Depends(get_db),
+    admin=Depends(require_admin),
 ):
     try:
         if not product_service.update_product(db, product_id, data):
@@ -70,6 +78,7 @@ def update_product(
 def delete_product(
     product_id: int,
     db=Depends(get_db),
+    admin=Depends(require_admin),
 ):
     try:
         if not product_service.delete_product(db, product_id):
