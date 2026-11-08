@@ -20,8 +20,13 @@ class ProductData(BaseModel):
     is_active: bool = True
 
 
+class StockAdjustment(BaseModel):
+    quantity_change: int
+    reason: str
+
+
 @router.post("")
-def create_product(data: ProductData, db=Depends(get_db), admin=Depends(require_admin)):
+def create_product(data: ProductData, db=Depends(get_db)):
     try:
         product_service.create_product(db, data)
         return {"message": "Product created"}
@@ -52,7 +57,6 @@ def update_product(
     product_id: int,
     data: ProductData,
     db=Depends(get_db),
-    admin=Depends(require_admin),
 ):
     try:
         if not product_service.update_product(db, product_id, data):
@@ -66,7 +70,6 @@ def update_product(
 def delete_product(
     product_id: int,
     db=Depends(get_db),
-    admin=Depends(require_admin),
 ):
     try:
         if not product_service.delete_product(db, product_id):
@@ -74,3 +77,20 @@ def delete_product(
         return {"message": "Product deleted"}
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
+
+
+@router.post("/{product_id}/stock-adjustments")
+def adjust_stock(
+    product_id: int,
+    data: StockAdjustment,
+    db=Depends(get_db),
+    admin=Depends(require_admin),
+):
+    try:
+        if not product_service.adjust_stock(
+            db, product_id, data.quantity_change, data.reason, admin["id"]
+        ):
+            raise HTTPException(status_code=404, detail="Product not found")
+        return {"message": "Stock adjusted"}
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))

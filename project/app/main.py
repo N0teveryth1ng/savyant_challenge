@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import config
-from app.routers import auth, customers, products
+from app.routers import auth, customers, orders, products
 
 app = FastAPI(title="Sales Order & Inventory Management")
 
@@ -13,12 +13,13 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 app.include_router(auth.router)
 app.include_router(customers.router)
+app.include_router(orders.router)
 app.include_router(products.router)
 
 
 
 
-# health check 
+# health status check 
 @app.get("/health")
 def health():
     return {"status": "ok"}

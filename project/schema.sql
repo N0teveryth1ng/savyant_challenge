@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     customer_id INT UNSIGNED NOT NULL,
     created_by INT UNSIGNED NOT NULL,
-    status ENUM('pending', 'confirmed', 'cancelled') NOT NULL DEFAULT 'pending',
+    status ENUM('draft', 'confirmed', 'cancelled') NOT NULL DEFAULT 'draft',
     discount_percent DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
     subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     total DECIMAL(12, 2) NOT NULL DEFAULT 0.00,

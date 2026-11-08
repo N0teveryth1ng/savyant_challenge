@@ -66,6 +66,7 @@ def update_product(db, product_id, data):
                  data.stock_quantity, data.is_active, product_id),
             )
         db.commit()
+    
     except pymysql.err.IntegrityError as error:
         db.rollback()
         raise ValueError("Product code already exists") from error
@@ -84,3 +85,38 @@ def delete_product(db, product_id):
         raise ValueError(
             "Product is used by an order or stock movement; deactivate it instead"
         ) from error
+
+
+def adjust_stock(db, product_id, quantity_change, reason, user_id):
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT stock_quantity FROM products WHERE id = %s FOR UPDATE",
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if not product:
+                db.rollback()
+                return False
+
+            new_quantity = product["stock_quantity"] + quantity_change
+            if new_quantity < 0:
+                raise ValueError("Stock cannot be negative")
+
+            cur.execute(
+                "UPDATE products SET stock_quantity = %s WHERE id = %s",
+                (new_quantity, product_id),
+            )
+            cur.execute(
+                "INSERT INTO stock_movements "
+                "(product_id, changed_by, quantity_change, reason) "
+                "VALUES (%s, %s, %s, %s)",
+                (product_id, user_id, quantity_change, reason),
+            )
+
+        db.commit()
+        return True
+    
+    except Exception:
+        db.rollback()
+        raise

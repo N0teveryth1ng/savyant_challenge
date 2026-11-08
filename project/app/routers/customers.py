@@ -1,10 +1,11 @@
+# handles http requests
+
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.dependencies import require_admin
 from app.services import customer_service
 
 router = APIRouter(prefix="/customers", tags=["customers"])
@@ -19,10 +20,11 @@ class CustomerData(BaseModel):
 
 
 @router.post("")
-def create_customer(data: CustomerData, db=Depends(get_db), admin=Depends(require_admin)):
+def create_customer(data: CustomerData, db=Depends(get_db)):
     try:
         customer_service.create_customer(db, data)
         return {"message": "Customer created"}
+    
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 
@@ -41,6 +43,7 @@ def get_customer(customer_id: int, db=Depends(get_db)):
     customer = customer_service.get_customer(db, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+    
     return customer
 
 
@@ -49,12 +52,12 @@ def update_customer(
     customer_id: int,
     data: CustomerData,
     db=Depends(get_db),
-    admin=Depends(require_admin),
 ):
     try:
         if not customer_service.update_customer(db, customer_id, data):
             raise HTTPException(status_code=404, detail="Customer not found")
         return {"message": "Customer updated"}
+    
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error))
 
@@ -63,7 +66,6 @@ def update_customer(
 def delete_customer(
     customer_id: int,
     db=Depends(get_db),
-    admin=Depends(require_admin),
 ):
     try:
         if not customer_service.delete_customer(db, customer_id):
