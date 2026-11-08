@@ -1,112 +1,86 @@
-# Sales Order and Inventory Management
+# Sales & Inventory Management
 
-A small local sales and stock application built with Python 3.10+, FastAPI, MySQL, HTML, CSS, and JavaScript. The API is JSON based and the page uses `fetch()` to call it.
+A simple local application for managing customer records, products, sales orders, and stock. It replaces spreadsheet-based tracking with a browser interface and a MySQL database.
 
-## Setup and run
+## At a glance
 
-1. Install MySQL and create a local database user.
-2. From this folder, copy `.env.example` to `.env` and set `DB_USER`, `DB_PASSWORD`, and a long random `SECRET_KEY`.
-3. For a new database, run `schema.sql` in MySQL. It creates `SAVYANT`, its six tables, and sample users, customers, and products. If upgrading the existing earlier project database, run `migrations/001_order_number_discount.sql` once instead; it adds the order number and discount amount while preserving existing rows.
-4. From this folder, install and start the app:
+- **Application:** Sales Order and Inventory Management
+- **Technology:** Python, FastAPI, HTML, CSS, JavaScript, and MySQL
+- **Intended use:** Local demonstration and coursework
+- **Currency and stock:** One currency and one stock location
+- **Quantities:** Whole numbers
+- **Taxes, delivery, purchasing, and payments:** Not included
 
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
+## What you can do
 
-Open <http://localhost:8000>. Interactive API documentation is at <http://localhost:8000/docs>.
+### Manage customers and products
 
-Python 3.10 or newer and MySQL 8 are expected. The dependency list is in `requirements.txt`.
+Administrators can add, view, edit, and remove customers and products. They can search and filter records, deactivate records that should no longer be used, and adjust product stock with a reason. Products have a unique code, category, price, available quantity, and active status.
 
-## Sample accounts
+Sales users can view active customers and products. They cannot change customer or product records, adjust stock, import products, or view reports. These permissions are checked by the application, including for direct requests.
 
-Both local sample accounts use `ChangeMe123!`:
+### Create and manage orders
+
+Users can create Draft orders for active customers using active products. The application uses each product’s current saved price, checks quantities, prevents duplicate products in an order, and calculates the subtotal, discount, and total. Discounts may be from zero to twenty percent.
+
+Users can edit their own Draft orders. Administrators can view and manage all orders; Sales users can access only their own. Confirming an order checks stock and deducts it. Cancelling a confirmed order restores the stock. The order and its stock changes are saved together, and repeating a confirmation or cancellation does not repeat the stock change.
+
+### Review reports and import products
+
+Administrators can review customer sales, product sales, low stock, and stock movement history. Customer sales can be limited to a date range, and the low stock report accepts a quantity threshold. The project also includes five standalone SQL report queries.
+
+Administrators can import products from a CSV file. The application checks the full file before importing; if any row is invalid, no products are added. Errors identify the row and reason. Opening quantities from a successful import are recorded in stock history. Example valid and invalid files are in the sample data folder.
+
+## Roles
+
+| Role | Access |
+| --- | --- |
+| Administrator | Manage customers and products, adjust stock, manage all orders, import products, and view reports |
+| Sales user | View active customers and products, create and manage their own orders |
+
+## Run locally
+
+The application requires Python 3.10 or newer and MySQL 8. Install the project’s listed Python dependencies, configure a local database connection using the provided environment settings example, and initialize the database using the supplied schema. The schema creates the database tables and demonstration records.
+
+For an existing database created from the earlier project schema, apply the included one-time database update instead of recreating the database. It adds the order number and discount amount while preserving existing records. New databases already include those fields in the main schema.
+
+Once the database and settings are ready, start the application using the project’s local FastAPI server setup and open **http://localhost:8000** in a browser. The interactive API reference is available at **http://localhost:8000/docs**.
+
+## Demonstration accounts
+
+Both sample accounts use the same demonstration password, **ChangeMe123!**
 
 | Role | Email |
 | --- | --- |
-| Admin | `admin@example.com` |
-| Sales | `sales@example.com` |
+| Administrator | admin@example.com |
+| Sales user | sales@example.com |
 
-These are demonstration credentials only. The database stores bcrypt password hashes. Do not reuse these credentials outside this local project.
+These accounts are for local demonstration only. Passwords are stored as bcrypt hashes in the database. The project does not include account creation, user management, or password recovery screens.
 
-## What it does
+## Data and reliability
 
-- Admins can manage customers and products, adjust stock, manage all orders, import products, and view reports.
-- Sales users can see active customers and products, create and edit their own Draft orders, and confirm or cancel their own orders.
-- The backend checks role, order ownership, active records, quantities, prices, and discounts. Browser totals are only a preview.
-- Order prices are copied from the current product price when a Draft is created or edited. The order stores its own rate and item amount.
-- Confirming an order locks its order and product rows in one MySQL transaction. It checks all quantities before deducting any stock and writing stock movements. A cancellation restores stock in the same transaction. Repeated actions do not repeat stock changes.
-- Money uses `DECIMAL(12,2)` in MySQL and Python `Decimal` calculations rounded to two decimal places.
-- Foreign keys prevent deleting customers or products that are referenced by orders or stock movements; deactivate them instead.
+The database contains six related tables: users, customers, products, sales orders, sales order items, and stock movements. Foreign keys protect records that are referenced by orders or stock history. Such customers and products cannot be deleted; they can be deactivated instead.
 
-This assignment assumes one currency and one stock location, whole-number quantities, and no tax, delivery, purchasing, or payment processing. Only confirmed orders appear in sales reports. There is no password reset or user management screen; demo users are inserted by `schema.sql`.
+Prices and order totals are stored using fixed-precision decimal values and calculated on the server. Browser totals are previews only. On confirmation, the application locks the relevant database rows, checks all requested stock, then saves the deduction and movement history in one transaction. If stock is short, the confirmation makes no changes.
 
-## API examples
+Only confirmed orders are included in sales reports. Product sales show the gross value of sold items before order discounts. Customer sales show the confirmed order total after discount and include customers with no matching orders in the selected period.
 
-The session cookie from login authenticates subsequent calls. Login and logout:
+## Tests
 
-```http
-POST /api/login
-Content-Type: application/json
+The project includes automated tests for total calculations, invalid quantities and discounts, order permissions, stock confirmation and cancellation, and all-or-nothing CSV imports. Tests use a separate database named sales_inventory_test, load the supplied schema, and reset its tables before each test. They do not clear the normal SAVYANT database.
 
-{"email":"sales@example.com","password":"ChangeMe123!"}
-```
+The current test suite contains 20 tests. Configure the local MySQL connection before running the test suite from the project folder.
 
-```http
-POST /api/logout
-```
+## Project contents
 
-Get active products (optional `search`, `category`, `is_active`, `limit`, and `offset`; sales users always see active products):
+- **Database schema and sample data:** Main project folder
+- **Earlier database update:** Migrations folder
+- **Application and browser interface:** Application folder
+- **Standalone report queries:** SQL queries file
+- **CSV examples:** Sample data folder
+- **Automated tests:** Tests folder
+- **AI assistance disclosure:** AI usage document
 
-```http
-GET /api/products?search=lamp&limit=20&offset=0
-```
+## Demo walkthrough
 
-Create a Draft order (the server looks up product prices):
-
-```http
-POST /api/orders
-Content-Type: application/json
-
-{"customer_id":1,"items":[{"product_id":1,"quantity":2}],"discount_percent":10}
-```
-
-The response includes the generated order number and ID, for example:
-
-```json
-{"id":1,"order_number":"SO-0123456789AB","status":"draft"}
-```
-
-Other order calls are `GET /api/orders/{id}`, `PUT /api/orders/{id}` (Draft only), `POST /api/orders/{id}/confirm`, and `POST /api/orders/{id}/cancel`. A Sales user receives 404 when requesting another user's order. Unauthenticated requests return 401, forbidden actions return 403, invalid inputs return 4xx JSON details, and unexpected errors do not return tracebacks.
-
-Customer routes are under `/api/customers`; product routes are under `/api/products`. The admin stock adjustment route is `POST /api/products/{id}/stock-adjustments`. Four admin reports are under `/api/reports`: `customer-sales`, `product-sales`, `low-stock`, and `stock-movements`. Customer-sales accepts `date_from` and `date_to`; low-stock accepts `threshold`.
-
-## CSV import
-
-Admins can import a CSV through `POST /api/products/import-csv` using multipart field `file`. Required headers, in order, are `product_code,product_name,category,price,stock_quantity,status`; status is `active` or `inactive`. It validates the full file first and imports nothing if any row is invalid. Errors include row numbers. Imported opening quantities are recorded as stock movements. Examples are in `sample_data/products_valid.csv` and `sample_data/products_invalid.csv`.
-
-## Tests and debugging exercise
-
-Set valid local MySQL credentials in `.env`. From this folder:
-
-```powershell
-pytest -v
-```
-
-Tests use the separate `sales_inventory_test` database and load `schema.sql` there; they do not clear the normal `SAVYANT` database. The fixture clears and seeds test tables before each test.
-
-`calculate_totals()` adds each line amount to the running total. The original bug assigned `total = amount` on every loop, so only the last item's amount remained. An empty item list returns zero subtotal, discount, and total. Missing quantity or rate, zero or negative quantity, negative rate, and discounts outside 0–20 are rejected. The tests cover these cases and the required order, stock, access, and CSV scenarios.
-
-## Project files
-
-- `schema.sql`: database tables, keys, constraints, and local sample data.
-- `migrations/`: additive SQL for the earlier local database schema.
-- `app/routers/`: HTTP routes and request validation.
-- `app/services/`: SQL and application rules.
-- `sql_queries.sql`: the five standalone report queries.
-- `tests/`: pytest coverage.
-- `AI_USAGE.md`: AI assistance disclosure and review notes.
-
-For the assignment demo, record a 5–8 minute walkthrough covering login as both roles, master data permissions, an order and stock confirmation/cancellation, a report, CSV import, and the tests. A video file is not generated by the app and must be recorded separately.
+The assignment demo should take five to eight minutes. Show both roles, demonstrate that Sales users cannot change master data, create and confirm an order, cancel an order, review a report, import a CSV file, and show the test results. The recording is a separate submission item and is not included in the application.
