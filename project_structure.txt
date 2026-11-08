@@ -1,0 +1,190 @@
+project/
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── config.py
+│   ├── database.py
+│   ├── dependencies.py
+│   ├── routers/        # auth.py, products.py, orders.py ...
+│   ├── services/       # order_service.py (calculations, confirm/cancel)
+│   ├── templates/
+│   └── static/
+├── tests/
+├── schema.sql
+├── .env.example
+├── .gitignore
+└── requirements.txt
+
+
+
+
+
+
+
+
+
+
+
+
+Keep `routers/` for HTTP handling, `services/` for business logic, and `database.py` for connections. That is the separation the brief asks for.
+
+**`.env.example`** (copy to `.env`, which stays out of Git):
+```
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=your_mysql_user
+DB_PASSWORD=your_mysql_password
+DB_NAME=sales_inventory
+SECRET_KEY=change-this-to-a-long-random-string
+```
+
+**`app/config.py`:**
+```python
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = int(os.getenv("DB_PORT", "3306"))
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+SECRET_KEY = os.getenv("SECRET_KEY")
+```
+
+**`app/database.py`:**
+```python
+import pymysql
+from pymysql.cursors import DictCursor
+from app import config
+
+
+def create_connection():
+    return pymysql.connect(
+        host=config.DB_HOST,
+        port=config.DB_PORT,
+        user=config.DB_USER,
+        password=config.DB_PASSWORD,
+        database=config.DB_NAME,
+        cursorclass=DictCursor,
+        autocommit=False,   # we control transactions ourselves
+    )
+
+
+def get_db():
+    """FastAPI dependency: one connection per request, always closed."""
+    conn = create_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
+```
+With `autocommit=False`, you decide when to call `conn.commit()` or `conn.rollback()`. That is what makes confirm/cancel atomic.
+
+**`app/dependencies.py`** (login and role checks):
+```python
+from fastapi import Depends, HTTPException, Request
+from app.database import get_db
+
+
+def get_current_user(request: Request, db=Depends(get_db)):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Login required")
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, email, role FROM users WHERE id = %s", (user_id,)
+        )
+        user = cur.fetchone()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid session")
+    return user
+
+
+def require_admin(user=Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+```
+Use `Depends(get_current_user)` on every protected route and `Depends(require_admin)` on admin-only routes. This is how you enforce permissions on the backend.
+
+**`app/main.py`:**
+```python
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
+
+from app import config
+# from app.routers import auth, products, orders   # add as you build them
+
+app = FastAPI(title="Sales Order & Inventory Management")
+
+app.add_middleware(SessionMiddleware, secret_key=config.SECRET_KEY)
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+# app.include_router(auth.router)
+# app.include_router(products.router)
+# app.include_router(orders.router)
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
+@app.exception_handler(Exception)
+def unhandled_error(request: Request, exc: Exception):
+    # Never expose tracebacks to the client
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+```
+
+**Example router (`app/routers/auth.py`)** to show the pattern:
+```python
+import bcrypt
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+from app.database import get_db
+
+router = APIRouter()
+
+
+class LoginData(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/api/login")
+def login(data: LoginData, request: Request, db=Depends(get_db)):
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM users WHERE email = %s", (data.email,))
+        user = cur.fetchone()
+
+    if not user or not bcrypt.checkpw(
+        data.password.encode(), user["password_hash"].encode()
+    ):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    request.session["user_id"] = user["id"]
+    return {"message": "Logged in", "role": user["role"]}
+
+
+@router.post("/api/logout")
+def logout(request: Request):
+    request.session.clear()
+    return {"message": "Logged out"}
+```
+
+**Run it:**
+```bash
+uvicorn app.main:app --reload
+```
+Open `http://127.0.0.1:8000/health` to check it works. FastAPI also generates interactive API docs at `http://127.0.0.1:8000/docs`, which helps with the API documentation deliverable. You can screenshot or reference it in the README.
+
+**FastAPI notes for the interview:**
+- `Depends(...)` is FastAPI's way of running shared logic (DB connection, login check) before a route. Be ready to explain it in one sentence.
+- Pydantic models (like `LoginData`) validate incoming JSON. Invalid input gets a 422 automatically, but the assignment wants clear error messages, so check the error format and customize it if needed.
+- Still write the business rules (discount 0–20, no duplicates, stock checks) in `services/`, not only in Pydantic. That keeps validation in one place for both the web pages and the API.

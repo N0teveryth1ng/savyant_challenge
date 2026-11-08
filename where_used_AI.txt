@@ -1,0 +1,4 @@
+- error tracking
+- UI design
+- Codebase setup (Arch, project structure, server setup, DB setup)
+- 
