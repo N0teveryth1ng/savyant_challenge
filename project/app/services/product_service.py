@@ -1,4 +1,87 @@
+import csv
+import io
+from decimal import Decimal, InvalidOperation
+
 import pymysql
+
+
+def import_products_csv(db, csv_text, user_id):
+    columns = ["product_code", "name", "category", "price", "stock_quantity", "is_active"]
+    reader = csv.DictReader(io.StringIO(csv_text))
+    if reader.fieldnames != columns:
+        raise ValueError("CSV headers must be: " + ", ".join(columns))
+
+    products = []
+    product_codes = set()
+    errors = []
+
+    for row_number, row in enumerate(reader, start=2):
+        row = {column: (row.get(column) or "").strip() for column in columns}
+        try:
+            if not row["product_code"] or not row["name"] or not row["category"]:
+                raise ValueError("product_code, name, and category are required")
+
+            if row["product_code"] in product_codes:
+                raise ValueError("duplicate product_code in file")
+            product_codes.add(row["product_code"])
+
+            price = Decimal(row["price"])
+            stock_quantity = int(row["stock_quantity"])
+            if not price.is_finite() or price < 0:
+                raise ValueError("price cannot be negative")
+            if stock_quantity < 0:
+                raise ValueError("stock_quantity cannot be negative")
+            if row["is_active"].lower() not in ("true", "false"):
+                raise ValueError("is_active must be true or false")
+
+            products.append({
+                "product_code": row["product_code"],
+                "name": row["name"],
+                "category": row["category"],
+                "price": price,
+                "stock_quantity": stock_quantity,
+                "is_active": row["is_active"].lower() == "true",
+            })
+        except (InvalidOperation, ValueError) as error:
+            errors.append(f"Row {row_number}: {error}")
+
+    if not products and not errors:
+        errors.append("CSV has no product rows")
+
+    if errors:
+        raise ValueError("; ".join(errors))
+
+    placeholders = ", ".join(["%s"] * len(products))
+    with db.cursor() as cur:
+        cur.execute(
+            f"SELECT sku FROM products WHERE sku IN ({placeholders})",
+            [product["product_code"] for product in products],
+        )
+        existing_codes = [row["sku"] for row in cur.fetchall()]
+    if existing_codes:
+        raise ValueError("Product code already exists: " + ", ".join(existing_codes))
+
+    try:
+        with db.cursor() as cur:
+            for product in products:
+                cur.execute(
+                    "INSERT INTO products "
+                    "(sku, product_name, category, unit_price, stock_quantity, is_active) "
+                    "VALUES (%s, %s, %s, %s, %s, %s)",
+                    (product["product_code"], product["name"], product["category"],
+                     product["price"], product["stock_quantity"], product["is_active"]),
+                )
+                cur.execute(
+                    "INSERT INTO stock_movements "
+                    "(product_id, changed_by, quantity_change, reason) "
+                    "VALUES (%s, %s, %s, %s)",
+                    (cur.lastrowid, user_id, product["stock_quantity"], "Opening stock import"),
+                )
+        db.commit()
+        return len(products)
+    except Exception:
+        db.rollback()
+        raise
 
 
 def create_product(db, data):

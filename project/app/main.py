@@ -1,10 +1,10 @@
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app import config
-from app.routers import auth, customers, orders, products
+from app.routers import auth, customers, orders, products, reports
 
 app = FastAPI(title="Sales Order & Inventory Management")
 
@@ -15,6 +15,12 @@ app.include_router(auth.router)
 app.include_router(customers.router)
 app.include_router(orders.router)
 app.include_router(products.router)
+app.include_router(reports.router)
+
+
+@app.get("/")
+def home():
+    return FileResponse("app/templates/index.html")
 
 
 

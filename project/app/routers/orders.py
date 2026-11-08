@@ -18,7 +18,7 @@ class OrderItem(BaseModel):
 
 class OrderData(BaseModel):
     customer_id: int
-    items: List[OrderItem] = Field(min_items=1)
+    items: List[OrderItem] = Field(min_length=1)
     discount_percent: Decimal = Field(default=0, ge=0, le=20)
 
 

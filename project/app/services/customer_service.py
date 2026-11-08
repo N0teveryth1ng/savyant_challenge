@@ -59,6 +59,7 @@ def update_customer(db, customer_id, data):
                 (data.name, data.email, data.mobile, data.city, data.is_active, customer_id),
             )
         db.commit()
+    
     except pymysql.err.IntegrityError as error:
         db.rollback()
         raise ValueError("A customer with this email already exists") from error
@@ -72,6 +73,7 @@ def delete_customer(db, customer_id):
             deleted = cur.rowcount > 0
         db.commit()
         return deleted
+    
     except pymysql.err.IntegrityError as error:
         db.rollback()
         raise ValueError("Customer has orders; deactivate it instead") from error

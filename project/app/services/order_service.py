@@ -1,9 +1,15 @@
 from decimal import Decimal
 
 
-def calculate_totals(items, discount_percent):
+def calculate_totals(items, discount_percent=0):
     total = Decimal("0.00")
     for item in items:
+        if "quantity" not in item or "unit_price" not in item:
+            raise ValueError("Each item needs a quantity and rate")
+        if item["quantity"] <= 0:
+            raise ValueError("Quantity must be greater than zero")
+        if item["unit_price"] < 0:
+            raise ValueError("Rate cannot be negative")
         amount = item["unit_price"] * item["quantity"]
         total += amount
 

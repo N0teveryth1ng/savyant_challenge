@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from app.database import get_db
@@ -93,4 +93,18 @@ def adjust_stock(
             raise HTTPException(status_code=404, detail="Product not found")
         return {"message": "Stock adjusted"}
     except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error))
+
+
+@router.post("/import-csv")
+async def import_products(
+    file: UploadFile = File(...),
+    db=Depends(get_db),
+    admin=Depends(require_admin),
+):
+    try:
+        csv_text = (await file.read()).decode("utf-8-sig")
+        count = product_service.import_products_csv(db, csv_text, admin["id"])
+        return {"message": f"{count} products imported"}
+    except (UnicodeDecodeError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error))

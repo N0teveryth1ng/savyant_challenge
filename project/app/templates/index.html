@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sales and Inventory</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">LOCAL SALES TOOL</p>
+      <h1>Sales &amp; Inventory</h1>
+    </div>
+    <form id="login-form" class="login-form">
+      <input name="email" type="email" placeholder="Email" required>
+      <input name="password" type="password" placeholder="Password" required>
+      <button type="submit">Log in</button>
+      <button type="button" id="logout-button" class="secondary">Log out</button>
+    </form>
+  </header>
+
+  <main>
+    <nav class="tabs" aria-label="Sections">
+      <button class="tab active" data-page="customers">Customers</button>
+      <button class="tab" data-page="products">Products</button>
+      <button class="tab" data-page="orders">Orders</button>
+      <button class="tab" data-page="reports">Reports</button>
+    </nav>
+    <p id="message" role="status" class="message"></p>
+
+    <section id="customers-page" class="page">
+      <div class="section-heading"><div><p class="eyebrow">CUSTOMER RECORDS</p><h2>Customers</h2></div><button id="reload-customers" class="secondary">Refresh</button></div>
+      <form id="customer-form" class="form-grid card">
+        <input name="name" placeholder="Name" required>
+        <input name="email" type="email" placeholder="Email" required>
+        <input name="mobile" placeholder="Mobile" required>
+        <input name="city" placeholder="City" required>
+        <label class="check"><input name="is_active" type="checkbox" checked> Active</label>
+        <div class="form-actions"><button type="submit">Add customer</button><button type="button" id="cancel-customer-edit" class="secondary hidden">Cancel edit</button></div>
+      </form>
+      <div class="table-wrap card"><table><thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>City</th><th>Status</th><th></th></tr></thead><tbody id="customers-table"></tbody></table></div>
+    </section>
+
+    <section id="products-page" class="page hidden">
+      <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Products</h2></div><button id="reload-products" class="secondary">Refresh</button></div>
+      <form id="product-form" class="form-grid card">
+        <input name="product_code" placeholder="Product code" required>
+        <input name="name" placeholder="Name" required>
+        <input name="category" placeholder="Category" required>
+        <input name="price" type="number" min="0" step="0.01" placeholder="Price" required>
+        <input name="stock_quantity" type="number" min="0" step="1" placeholder="Stock" required>
+        <label class="check"><input name="is_active" type="checkbox" checked> Active</label>
+        <div class="form-actions"><button type="submit">Add product</button><button type="button" id="cancel-product-edit" class="secondary hidden">Cancel edit</button></div>
+      </form>
+      <form id="csv-form" class="card inline-form">
+        <label>Import products CSV <input name="file" type="file" accept=".csv,text/csv" required></label>
+        <button type="submit">Import CSV</button>
+      </form>
+      <div class="table-wrap card"><table><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead><tbody id="products-table"></tbody></table></div>
+    </section>
+
+    <section id="orders-page" class="page hidden">
+      <div class="section-heading"><div><p class="eyebrow">ORDER DESK</p><h2>Draft an order</h2></div><button id="reload-orders" class="secondary">Refresh orders</button></div>
+      <form id="order-form" class="card order-form">
+        <label>Customer <select name="customer_id" id="order-customer" required></select></label>
+        <div class="section-heading compact"><h3>Items</h3><button type="button" id="add-order-row" class="secondary">Add item</button></div>
+        <div id="order-rows"></div>
+        <label class="discount">Discount (%) <input name="discount_percent" id="discount" type="number" min="0" max="20" step="0.01" value="0"></label>
+        <div class="totals"><span>Subtotal <strong id="subtotal">$0.00</strong></span><span>Total <strong id="total">$0.00</strong></span></div>
+        <button type="submit" id="create-order-button" disabled>Create draft order</button>
+      </form>
+      <div class="section-heading"><h2>Orders</h2></div>
+      <div class="table-wrap card"><table><thead><tr><th>ID</th><th>Customer</th><th>Status</th><th>Subtotal</th><th>Total</th><th></th></tr></thead><tbody id="orders-table"></tbody></table></div>
+    </section>
+
+    <section id="reports-page" class="page hidden">
+      <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2>Reports</h2></div></div>
+      <div class="report-buttons">
+        <button data-report="sales-by-customer">Sales by customer</button>
+        <button data-report="sales-by-product">Sales by product</button>
+        <button data-report="monthly-sales">Monthly sales</button>
+        <button data-report="inventory">Inventory</button>
+      </div>
+      <div id="report-results" class="table-wrap card"></div>
+    </section>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
