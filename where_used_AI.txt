@@ -1,5 +1,5 @@
 - error tracking
-- UI design
+- Basic UI 
 - Codebase setup (Arch, project structure, server setup, DB setup)
 - 
 
@@ -8,5 +8,6 @@
 
 
 WHAT I DID MYSELF:
-- main.py 
+- customers.py, customers_service.py 
+- products.py, products_service.py
 - 
