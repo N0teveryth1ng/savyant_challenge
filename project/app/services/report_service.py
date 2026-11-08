@@ -1,45 +1,58 @@
-def sales_by_customer(db):
+def customer_sales(db, date_from=None, date_to=None):
+    join = " LEFT JOIN sales_orders o ON o.customer_id = c.id AND o.status = 'confirmed'"
+    params = []
+    if date_from:
+        join += " AND DATE(o.created_at) >= %s"
+        params.append(date_from)
+    if date_to:
+        join += " AND DATE(o.created_at) <= %s"
+        params.append(date_to)
+
+    query = (
+        "SELECT c.id, c.customer_name AS name, COUNT(o.id) AS order_count, "
+        "COALESCE(SUM(o.total), 0) AS sales_total FROM customers c"
+        + join
+        + " GROUP BY c.id, c.customer_name ORDER BY sales_total DESC"
+    )
     with db.cursor() as cur:
-        cur.execute(
-            "SELECT c.id, c.customer_name AS name, COUNT(o.id) AS order_count, "
-            "COALESCE(SUM(o.total), 0) AS sales_total "
-            "FROM customers c LEFT JOIN sales_orders o "
-            "ON o.customer_id = c.id AND o.status = 'confirmed' "
-            "GROUP BY c.id, c.customer_name ORDER BY sales_total DESC"
-        )
+        cur.execute(query, params)
         return cur.fetchall()
 
 
-def sales_by_product(db):
+def product_sales(db):
     with db.cursor() as cur:
         cur.execute(
             "SELECT p.id, p.sku AS product_code, p.product_name AS name, "
-            "SUM(i.quantity) AS units_sold, SUM(i.line_total) AS line_sales "
+            "SUM(i.quantity) AS quantity_sold, SUM(i.line_total) AS gross_item_value "
             "FROM sales_order_items i "
             "JOIN sales_orders o ON o.id = i.sales_order_id "
             "JOIN products p ON p.id = i.product_id "
             "WHERE o.status = 'confirmed' "
-            "GROUP BY p.id, p.sku, p.product_name ORDER BY units_sold DESC"
+            "GROUP BY p.id, p.sku, p.product_name "
+            "ORDER BY quantity_sold DESC"
         )
         return cur.fetchall()
 
 
-def monthly_sales(db):
+def low_stock(db, threshold):
     with db.cursor() as cur:
         cur.execute(
-            "SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, "
-            "COUNT(*) AS order_count, SUM(total) AS sales_total "
-            "FROM sales_orders WHERE status = 'confirmed' "
-            "GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY month"
+            "SELECT sku AS product_code, product_name AS name, category, stock_quantity "
+            "FROM products WHERE stock_quantity < %s ORDER BY stock_quantity",
+            (threshold,),
         )
         return cur.fetchall()
 
 
-def inventory(db):
+def stock_movement_history(db):
     with db.cursor() as cur:
         cur.execute(
-            "SELECT sku AS product_code, product_name AS name, category, "
-            "stock_quantity, unit_price, is_active "
-            "FROM products ORDER BY product_name"
+            "SELECT p.sku AS product_code, p.product_name AS name, "
+            "CASE WHEN m.quantity_change >= 0 THEN 'IN' ELSE 'OUT' END AS movement_type, "
+            "m.quantity_change, o.order_number, m.reason, m.created_at, u.name AS changed_by "
+            "FROM stock_movements m JOIN products p ON p.id = m.product_id "
+            "LEFT JOIN sales_orders o ON o.id = m.sales_order_id "
+            "LEFT JOIN users u ON u.id = m.changed_by "
+            "ORDER BY m.created_at DESC"
         )
         return cur.fetchall()

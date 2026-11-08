@@ -1,3 +1,3 @@
-product_code,name,category,price,stock_quantity,is_active
-CSV-LAMP-01,Sample Desk Lamp,Lighting,29.99,15,true
-CSV-NOTE-01,Sample Notebook,Stationery,4.50,40,true
+product_code,product_name,category,price,stock_quantity,status
+CSV-LAMP-01,Sample Desk Lamp,Lighting,29.99,15,active
+CSV-NOTE-01,Sample Notebook,Stationery,4.50,40,active

@@ -31,7 +31,7 @@
 
     <section id="customers-page" class="page">
       <div class="section-heading"><div><p class="eyebrow">CUSTOMER RECORDS</p><h2>Customers</h2></div><button id="reload-customers" class="secondary">Refresh</button></div>
-      <form id="customer-form" class="form-grid card">
+      <form id="customer-form" class="form-grid card hidden">
         <input name="name" placeholder="Name" required>
         <input name="email" type="email" placeholder="Email" required>
         <input name="mobile" placeholder="Mobile" required>
@@ -44,7 +44,7 @@
 
     <section id="products-page" class="page hidden">
       <div class="section-heading"><div><p class="eyebrow">CATALOGUE</p><h2>Products</h2></div><button id="reload-products" class="secondary">Refresh</button></div>
-      <form id="product-form" class="form-grid card">
+      <form id="product-form" class="form-grid card hidden">
         <input name="product_code" placeholder="Product code" required>
         <input name="name" placeholder="Name" required>
         <input name="category" placeholder="Category" required>
@@ -53,7 +53,7 @@
         <label class="check"><input name="is_active" type="checkbox" checked> Active</label>
         <div class="form-actions"><button type="submit">Add product</button><button type="button" id="cancel-product-edit" class="secondary hidden">Cancel edit</button></div>
       </form>
-      <form id="csv-form" class="card inline-form">
+      <form id="csv-form" class="card inline-form hidden">
         <label>Import products CSV <input name="file" type="file" accept=".csv,text/csv" required></label>
         <button type="submit">Import CSV</button>
       </form>
@@ -67,20 +67,25 @@
         <div class="section-heading compact"><h3>Items</h3><button type="button" id="add-order-row" class="secondary">Add item</button></div>
         <div id="order-rows"></div>
         <label class="discount">Discount (%) <input name="discount_percent" id="discount" type="number" min="0" max="20" step="0.01" value="0"></label>
-        <div class="totals"><span>Subtotal <strong id="subtotal">$0.00</strong></span><span>Total <strong id="total">$0.00</strong></span></div>
+        <div class="totals"><span>Subtotal <strong id="subtotal">0.00</strong></span><span>Discount <strong id="discount-amount">0.00</strong></span><span>Total <strong id="total">0.00</strong></span></div>
         <button type="submit" id="create-order-button" disabled>Create draft order</button>
       </form>
       <div class="section-heading"><h2>Orders</h2></div>
-      <div class="table-wrap card"><table><thead><tr><th>ID</th><th>Customer</th><th>Status</th><th>Subtotal</th><th>Total</th><th></th></tr></thead><tbody id="orders-table"></tbody></table></div>
+      <div class="table-wrap card"><table><thead><tr><th>Order</th><th>Customer</th><th>Status</th><th>Subtotal</th><th>Total</th><th></th></tr></thead><tbody id="orders-table"></tbody></table></div>
     </section>
 
     <section id="reports-page" class="page hidden">
       <div class="section-heading"><div><p class="eyebrow">OVERVIEW</p><h2>Reports</h2></div></div>
+      <div class="card report-filters">
+        <label>From <input id="report-date-from" type="date"></label>
+        <label>To <input id="report-date-to" type="date"></label>
+        <label>Low stock threshold <input id="report-threshold" type="number" min="0" value="5"></label>
+      </div>
       <div class="report-buttons">
-        <button data-report="sales-by-customer">Sales by customer</button>
-        <button data-report="sales-by-product">Sales by product</button>
-        <button data-report="monthly-sales">Monthly sales</button>
-        <button data-report="inventory">Inventory</button>
+        <button data-report="customer-sales">Customer sales</button>
+        <button data-report="product-sales">Product sales</button>
+        <button data-report="low-stock">Low stock</button>
+        <button data-report="stock-movements">Stock movements</button>
       </div>
       <div id="report-results" class="table-wrap card"></div>
     </section>

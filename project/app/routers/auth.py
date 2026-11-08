@@ -2,8 +2,14 @@ import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from app.database import get_db
+from app.dependencies import get_current_user
 
 router = APIRouter()
+
+
+@router.get("/api/me")
+def current_user(user=Depends(get_current_user)):
+    return user
 
 
 class LoginData(BaseModel):

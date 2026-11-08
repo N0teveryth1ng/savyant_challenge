@@ -5,6 +5,20 @@ const orderRows = document.getElementById("order-rows");
 
 let customers = [];
 let products = [];
+let currentRole = null;
+
+function applyRole(role) {
+  currentRole = role;
+  document.getElementById("customer-form").classList.toggle("hidden", role !== "admin");
+  document.getElementById("product-form").classList.toggle("hidden", role !== "admin");
+  document.getElementById("csv-form").classList.toggle("hidden", role !== "admin");
+  document.querySelectorAll('[data-page="reports"]').forEach((tab) => {
+    tab.classList.toggle("hidden", role !== "admin");
+  });
+  if (role !== "admin" && document.querySelector('[data-page="reports"]').classList.contains("active")) {
+    document.querySelector('[data-page="customers"]').click();
+  }
+}
 
 function showMessage(text, isError = false) {
   message.textContent = text;
@@ -47,15 +61,15 @@ document.querySelectorAll(".tab").forEach((button) => {
 });
 
 async function loadCustomers() {
-  customers = await api("/customers");
+  customers = await api("/api/customers");
   document.getElementById("customers-table").innerHTML = customers.map((customer) => `
     <tr>
       <td>${escapeHtml(customer.name)}</td><td>${escapeHtml(customer.email)}</td>
       <td>${escapeHtml(customer.mobile)}</td><td>${escapeHtml(customer.city)}</td>
       <td>${customer.is_active ? "Active" : "Inactive"}</td>
-      <td class="actions">
+      <td class="actions">${currentRole === "admin" ? `
         <button class="secondary" onclick="editCustomer(${customer.id})">Edit</button>
-        <button class="danger" onclick="deleteCustomer(${customer.id})">Delete</button>
+        <button class="danger" onclick="deleteCustomer(${customer.id})">Delete</button>` : ""}
       </td>
     </tr>`).join("");
   document.getElementById("order-customer").innerHTML = customers
@@ -74,7 +88,7 @@ customerForm.addEventListener("submit", async (event) => {
       city: form.get("city"), is_active: form.get("is_active") === "on",
     };
     const id = customerForm.dataset.id;
-    await api(id ? `/customers/${id}` : "/customers", {
+    await api(id ? `/api/customers/${id}` : "/api/customers", {
       method: id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
     });
@@ -102,7 +116,7 @@ window.editCustomer = (id) => {
 window.deleteCustomer = async (id) => {
   if (!confirm("Delete this customer?")) return;
   try {
-    await api(`/customers/${id}`, { method: "DELETE" });
+    await api(`/api/customers/${id}`, { method: "DELETE" });
     await loadCustomers();
     showMessage("Customer deleted.");
   } catch (error) { showMessage(error.message, true); }
@@ -117,16 +131,17 @@ document.getElementById("cancel-customer-edit").addEventListener("click", () => 
 });
 
 async function loadProducts() {
-  products = await api("/products");
+  const result = await api("/api/products?limit=100");
+  products = result.items;
   document.getElementById("products-table").innerHTML = products.map((product) => `
     <tr>
       <td>${escapeHtml(product.product_code)}</td><td>${escapeHtml(product.name)}</td>
       <td>${escapeHtml(product.category)}</td><td>${Number(product.price).toFixed(2)}</td>
       <td>${product.stock_quantity}</td><td>${product.is_active ? "Active" : "Inactive"}</td>
-      <td class="actions">
+      <td class="actions">${currentRole === "admin" ? `
         <button class="secondary" onclick="editProduct(${product.id})">Edit</button>
         <button class="secondary" onclick="adjustProductStock(${product.id})">Stock</button>
-        <button class="danger" onclick="deleteProduct(${product.id})">Delete</button>
+        <button class="danger" onclick="deleteProduct(${product.id})">Delete</button>` : ""}
       </td>
     </tr>`).join("");
 }
@@ -142,7 +157,7 @@ productForm.addEventListener("submit", async (event) => {
       stock_quantity: Number(form.get("stock_quantity")), is_active: form.get("is_active") === "on",
     };
     const id = productForm.dataset.id;
-    await api(id ? `/products/${id}` : "/products", {
+    await api(id ? `/api/products/${id}` : "/api/products", {
       method: id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
     });
@@ -175,7 +190,7 @@ window.editProduct = (id) => {
 window.deleteProduct = async (id) => {
   if (!confirm("Delete this product?")) return;
   try {
-    await api(`/products/${id}`, { method: "DELETE" });
+    await api(`/api/products/${id}`, { method: "DELETE" });
     await loadProducts();
     showMessage("Product deleted.");
   } catch (error) { showMessage(error.message, true); }
@@ -189,7 +204,7 @@ window.adjustProductStock = async (id) => {
   const reason = prompt("Reason for the stock change:");
   if (!reason) return;
   try {
-    await api(`/products/${id}/stock-adjustments`, {
+    await api(`/api/products/${id}/stock-adjustments`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ quantity_change, reason }),
     });
@@ -211,7 +226,7 @@ document.getElementById("csv-form").addEventListener("submit", async (event) => 
   const form = event.currentTarget;
   const button = form.querySelector("button");
   await withBusy(button, async () => {
-    const result = await api("/products/import-csv", { method: "POST", body: new FormData(form) });
+    const result = await api("/api/products/import-csv", { method: "POST", body: new FormData(form) });
     form.reset();
     await loadProducts();
     showMessage(result.message);
@@ -220,13 +235,13 @@ document.getElementById("csv-form").addEventListener("submit", async (event) => 
 
 function addOrderRow() {
   const options = products.filter((product) => product.is_active)
-    .map((product) => `<option value="${product.id}" data-price="${Number(product.price)}">${escapeHtml(product.name)} — ${Number(product.price).toFixed(2)}</option>`)
+    .map((product) => `<option value="${product.id}" data-price="${Number(product.price)}">${escapeHtml(product.name)} — ${Number(product.price).toFixed(2)} (stock ${product.stock_quantity})</option>`)
     .join("");
   const row = document.createElement("div");
   row.className = "order-row";
   row.innerHTML = `<select class="order-product" required>${options}</select>
     <input class="order-quantity" type="number" min="1" step="1" value="1" required>
-    <button type="button" class="danger remove-row">Remove</button>`;
+    <span class="order-amount">0.00</span><button type="button" class="danger remove-row">Remove</button>`;
   orderRows.appendChild(row);
   row.addEventListener("input", updateTotals);
   row.addEventListener("change", updateTotals);
@@ -243,22 +258,29 @@ async function refreshOrderRows() {
 
 function updateTotals() {
   let subtotal = 0;
-  let valid = orderRows.children.length > 0;
+  let valid = orderRows.children.length > 0 && Boolean(document.getElementById("order-customer").value);
   orderRows.querySelectorAll(".order-row").forEach((row) => {
     const product = row.querySelector(".order-product").selectedOptions[0];
     const quantity = Number(row.querySelector(".order-quantity").value);
     if (!product || !Number.isInteger(quantity) || quantity < 1) valid = false;
-    else subtotal += Number(product.dataset.price) * quantity;
+    else {
+      const amount = Number(product.dataset.price) * quantity;
+      subtotal += amount;
+      row.querySelector(".order-amount").textContent = amount.toFixed(2);
+    }
   });
   const discount = Number(document.getElementById("discount").value);
   if (discount < 0 || discount > 20) valid = false;
+  const discountAmount = subtotal * discount / 100;
   document.getElementById("subtotal").textContent = subtotal.toFixed(2);
-  document.getElementById("total").textContent = (subtotal * (1 - discount / 100)).toFixed(2);
+  document.getElementById("discount-amount").textContent = discountAmount.toFixed(2);
+  document.getElementById("total").textContent = (subtotal - discountAmount).toFixed(2);
   document.getElementById("create-order-button").disabled = !valid;
 }
 
 document.getElementById("add-order-row").addEventListener("click", addOrderRow);
 document.getElementById("discount").addEventListener("input", updateTotals);
+document.getElementById("order-customer").addEventListener("change", updateTotals);
 
 document.getElementById("order-form").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -268,38 +290,61 @@ document.getElementById("order-form").addEventListener("submit", async (event) =
       product_id: Number(row.querySelector(".order-product").value),
       quantity: Number(row.querySelector(".order-quantity").value),
     }));
-    const result = await api("/orders", {
-      method: "POST", headers: { "Content-Type": "application/json" },
+    const orderId = event.currentTarget.dataset.editId;
+    const result = await api(orderId ? `/api/orders/${orderId}` : "/api/orders", {
+      method: orderId ? "PUT" : "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         customer_id: Number(document.getElementById("order-customer").value),
         items, discount_percent: Number(document.getElementById("discount").value),
       }),
     });
-    showMessage(`Draft order #${result.id} created.`);
+    event.currentTarget.reset();
+    event.currentTarget.dataset.editId = "";
+    await refreshOrderRows();
+    showMessage(orderId ? "Draft order updated." : `Draft order ${result.order_number} created.`);
     await loadOrders();
   });
 });
 
 async function loadOrders() {
   try {
-    const orders = await api("/orders");
+    const orders = await api("/api/orders");
     document.getElementById("orders-table").innerHTML = orders.map((order) => {
       const customer = customers.find((item) => item.id === order.customer_id);
       const action = order.status === "draft"
-        ? `<button onclick="confirmOrder(${order.id})">Confirm</button><button class="secondary" onclick="cancelOrder(${order.id})">Cancel</button>`
+        ? `<button class="secondary" onclick="editOrder(${order.id})">Edit</button><button onclick="confirmOrder(${order.id})">Confirm</button><button class="secondary" onclick="cancelOrder(${order.id})">Cancel</button>`
         : order.status === "confirmed"
           ? `<button class="secondary" onclick="cancelOrder(${order.id})">Cancel</button>` : "";
-      return `<tr><td>${order.id}</td><td>${escapeHtml(customer?.name || order.customer_id)}</td>
+      return `<tr><td>${escapeHtml(order.order_number || order.id)}</td><td>${escapeHtml(customer?.name || order.customer_id)}</td>
         <td>${escapeHtml(order.status)}</td><td>${Number(order.subtotal).toFixed(2)}</td>
         <td>${Number(order.total).toFixed(2)}</td><td class="actions">${action}</td></tr>`;
     }).join("");
   } catch (error) { showMessage(error.message, true); }
 }
 
+window.editOrder = async (id) => {
+  try {
+    const order = await api(`/api/orders/${id}`);
+    document.getElementById("order-customer").value = order.customer_id;
+    document.getElementById("discount").value = order.discount_percent;
+    orderRows.replaceChildren();
+    for (const item of order.items) {
+      addOrderRow();
+      const row = orderRows.lastElementChild;
+      row.querySelector(".order-product").value = item.product_id;
+      row.querySelector(".order-quantity").value = item.quantity;
+    }
+    document.getElementById("order-form").dataset.editId = id;
+    updateTotals();
+    document.querySelector('[data-page="orders"]').click();
+    document.getElementById("order-form").scrollIntoView({ behavior: "smooth" });
+  } catch (error) { showMessage(error.message, true); }
+};
+
 window.confirmOrder = async (id) => {
   if (!confirm(`Confirm order #${id}? This will deduct stock.`)) return;
   try {
-    await api(`/orders/${id}/confirm`, { method: "POST" });
+    await api(`/api/orders/${id}/confirm`, { method: "POST" });
     await loadProducts(); await loadOrders();
     showMessage(`Order #${id} confirmed.`);
   } catch (error) { showMessage(error.message, true); }
@@ -308,7 +353,7 @@ window.confirmOrder = async (id) => {
 window.cancelOrder = async (id) => {
   if (!confirm(`Cancel order #${id}?`)) return;
   try {
-    await api(`/orders/${id}/cancel`, { method: "POST" });
+    await api(`/api/orders/${id}/cancel`, { method: "POST" });
     await loadProducts(); await loadOrders();
     showMessage(`Order #${id} cancelled.`);
   } catch (error) { showMessage(error.message, true); }
@@ -325,7 +370,19 @@ function showReport(rows) {
 document.querySelectorAll("[data-report]").forEach((button) => {
   button.addEventListener("click", async () => {
     await withBusy(button, async () => {
-      const rows = await api(`/reports/${button.dataset.report}`);
+      const query = new URLSearchParams();
+      if (button.dataset.report === "customer-sales") {
+        const from = document.getElementById("report-date-from").value;
+        const to = document.getElementById("report-date-to").value;
+        if (from) query.set("date_from", from);
+        if (to) query.set("date_to", to);
+      }
+      if (button.dataset.report === "low-stock") {
+        query.set("threshold", document.getElementById("report-threshold").value || "5");
+      }
+      const queryString = query.toString();
+      const suffix = queryString ? `?${queryString}` : "";
+      const rows = await api(`/api/reports/${button.dataset.report}${suffix}`);
       showReport(rows);
       showMessage("Report loaded.");
     });
@@ -342,8 +399,12 @@ document.getElementById("login-form").addEventListener("submit", async (event) =
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: values.get("email"), password: values.get("password") }),
     });
+    applyRole(result.role);
     form.reset();
     showMessage(`Logged in as ${result.role}.`);
+    await loadCustomers();
+    await loadProducts();
+    await refreshOrderRows();
     await loadOrders();
   });
 });
@@ -351,7 +412,14 @@ document.getElementById("login-form").addEventListener("submit", async (event) =
 document.getElementById("logout-button").addEventListener("click", async (event) => {
   await withBusy(event.currentTarget, async () => {
     await api("/api/logout", { method: "POST" });
+    applyRole(null);
+    customers = [];
+    products = [];
+    document.getElementById("customers-table").replaceChildren();
+    document.getElementById("products-table").replaceChildren();
     document.getElementById("orders-table").replaceChildren();
+    document.getElementById("order-customer").replaceChildren();
+    orderRows.replaceChildren();
     showMessage("Logged out.");
   });
 });
@@ -360,5 +428,10 @@ document.getElementById("reload-customers").addEventListener("click", (event) =>
 document.getElementById("reload-products").addEventListener("click", (event) => withBusy(event.currentTarget, loadProducts));
 document.getElementById("reload-orders").addEventListener("click", (event) => withBusy(event.currentTarget, loadOrders));
 
-loadCustomers().catch((error) => showMessage(error.message, true));
-loadProducts().then(refreshOrderRows).catch((error) => showMessage(error.message, true));
+api("/api/me").then(async (user) => {
+  applyRole(user.role);
+  await loadCustomers();
+  await loadProducts();
+  await refreshOrderRows();
+  await loadOrders();
+}).catch(() => {});
