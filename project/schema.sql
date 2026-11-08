@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS customers (
     email VARCHAR(255) NULL,
     phone VARCHAR(30) NULL,
     address VARCHAR(500) NULL,
+    city VARCHAR(100) NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_customers_email (email)
@@ -37,9 +39,11 @@ CREATE TABLE IF NOT EXISTS products (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     product_name VARCHAR(150) NOT NULL,
     sku VARCHAR(64) NOT NULL,
+    category VARCHAR(100) NOT NULL,
     description TEXT NULL,
     unit_price DECIMAL(12, 2) NOT NULL,
     stock_quantity INT UNSIGNED NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uq_products_sku (sku)
@@ -121,10 +125,10 @@ INSERT INTO customers (customer_name, email, phone, address) VALUES
     ('Acme Retail', 'buyer@acme.example', '555-0101', '100 Market Street'),
     ('Northwind Stores', 'orders@northwind.example', '555-0102', '25 Lake Avenue');
 
-INSERT INTO products (product_name, sku, description, unit_price, stock_quantity) VALUES
-    ('Desk Lamp', 'LAMP-001', 'Adjustable LED desk lamp', 39.99, 25),
-    ('Office Chair', 'CHAIR-001', 'Ergonomic office chair', 149.50, 12),
-    ('Notebook Pack', 'NOTE-001', 'Pack of five ruled notebooks', 8.25, 100);
+INSERT INTO products (product_name, sku, category, description, unit_price, stock_quantity) VALUES
+    ('Desk Lamp', 'LAMP-001', 'Lighting', 'Adjustable LED desk lamp', 39.99, 25),
+    ('Office Chair', 'CHAIR-001', 'Furniture', 'Ergonomic office chair', 149.50, 12),
+    ('Notebook Pack', 'NOTE-001', 'Stationery', 'Pack of five ruled notebooks', 8.25, 100);
 
 
 
