@@ -4,6 +4,8 @@ A simple local application for managing customer records, products, sales orders
 
 The application files and local setup resources are in the **project** folder.
 
+**AI use disclosure:** [Read AI_USAGE.md](AI_USAGE.md)
+
 ## At a glance
 
 - **Application:** Sales Order and Inventory Management
@@ -81,7 +83,7 @@ The current test suite contains 20 tests. Configure the local MySQL connection b
 - **Standalone report queries:** project/sql_queries.sql
 - **CSV examples:** project/sample_data
 - **Automated tests:** project/tests
-- **AI assistance disclosure:** project/AI_USAGE.md
+- **AI assistance disclosure:** AI_USAGE.md (also included in project/AI_USAGE.md)
 
 ## Demo walkthrough
 
