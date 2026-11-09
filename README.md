@@ -35,6 +35,10 @@ Administrators can review customer sales, product sales, low stock, and stock mo
 
 Administrators can import products from a CSV file. The application checks the full file before importing; if any row is invalid, no products are added. Errors identify the row and reason. Opening quantities from a successful import are recorded in stock history. Example valid and invalid files are in the sample data folder.
 
+## API examples
+
+Sample requests and responses for login, product lookup, and order workflows are in [project/API_EXAMPLES.md](project/API_EXAMPLES.md). The interactive API reference is available locally at **http://localhost:8000/docs**.
+
 ## Roles
 
 | Role | Access |
@@ -73,7 +77,11 @@ Only confirmed orders are included in sales reports. Product sales show the gros
 
 The project includes automated tests for total calculations, invalid quantities and discounts, order permissions, stock confirmation and cancellation, and all-or-nothing CSV imports. Tests use a separate database named sales_inventory_test, load the supplied schema, and reset its tables before each test. They do not clear the normal SAVYANT database. The test files are in **project/tests**.
 
-The current test suite contains 20 tests. Configure the local MySQL connection before running the test suite from the project folder.
+The current test suite contains 20 tests. Configure the local MySQL connection, open the **project** folder in a terminal, and run `pytest -v`.
+
+## Debugging exercise
+
+The original calculation bug assigned the current item amount to the running total on every loop, overwriting amounts from earlier items. The fixed `calculate_total()` adds each item amount to the running total. The required example with quantities and rates of 2 × 100 and 3 × 50 returns 350. An empty list returns zero; missing quantity or rate, zero or negative quantity, and negative rate are rejected. The tests cover these behaviors.
 
 ## Project contents
 
@@ -81,6 +89,7 @@ The current test suite contains 20 tests. Configure the local MySQL connection b
 - **Earlier database update:** project/migrations
 - **Application and browser interface:** project/app
 - **Standalone report queries:** project/sql_queries.sql
+- **API request and response examples:** project/API_EXAMPLES.md
 - **CSV examples:** project/sample_data
 - **Automated tests:** project/tests
 - **AI assistance disclosure:** AI_USAGE.md (also included in project/AI_USAGE.md)
